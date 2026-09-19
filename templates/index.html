@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Personal Expense Tracker</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+
+<body>
+
+    <div class="page">
+
+        <div class="container">
+
+
+            <!-- Header -->
+
+            <header class="header">
+
+                <div class="header-text">
+
+                    <h1>Personal Expense Tracker</h1>
+
+                    <p>
+                        Track, record and understand your everyday spending.
+                    </p>
+
+                </div>
+
+                <div class="agent-badge">
+                    AI Expense Agent
+                </div>
+
+            </header>
+
+
+            <!-- Summary -->
+
+            <section class="summary">
+
+                <div class="summary-box">
+
+                    <div class="summary-label">
+                        Total Spending
+                    </div>
+
+                    <div class="summary-value">
+                        ₹{{ "%.2f"|format(total_spending) }}
+                    </div>
+
+                    <div class="summary-note">
+                        All recorded expenses
+                    </div>
+
+                </div>
+
+
+                <div class="summary-box">
+
+                    <div class="summary-label">
+                        This Month
+                    </div>
+
+                    <div class="summary-value">
+                        ₹{{ "%.2f"|format(monthly_spending) }}
+                    </div>
+
+                    <div class="summary-note">
+                        Current month
+                    </div>
+
+                </div>
+
+
+                <div class="summary-box">
+
+                    <div class="summary-label">
+                        Transactions
+                    </div>
+
+                    <div class="summary-value">
+                        {{ transaction_count }}
+                    </div>
+
+                    <div class="summary-note">
+                        Recorded entries
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- Main Workspace -->
+
+            <section class="workspace">
+
+
+                <!-- Add Expense -->
+
+                <div class="card">
+
+                    <div class="card-heading">
+
+                        <div>
+
+                            <h2>Add Expense</h2>
+
+                            <p>
+                                Record a new transaction manually.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <form method="POST" action="/add-expense">
+
+
+                        <div class="form-row">
+
+                            <div class="form-group">
+
+                                <label for="amount">
+                                    Amount
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="amount"
+                                    name="amount"
+                                    placeholder="Enter amount"
+                                    step="0.01"
+                                    min="0"
+                                    required
+                                >
+
+                            </div>
+
+
+                            <div class="form-group">
+
+                                <label for="category">
+                                    Category
+                                </label>
+
+                                <select
+                                    id="category"
+                                    name="category"
+                                    required
+                                >
+
+                                    <option value="">
+                                        Select category
+                                    </option>
+
+                                    <option value="Food">
+                                        Food
+                                    </option>
+
+                                    <option value="Travel">
+                                        Travel
+                                    </option>
+
+                                    <option value="Shopping">
+                                        Shopping
+                                    </option>
+
+                                    <option value="Bills">
+                                        Bills
+                                    </option>
+
+                                    <option value="Entertainment">
+                                        Entertainment
+                                    </option>
+
+                                    <option value="Education">
+                                        Education
+                                    </option>
+
+                                    <option value="Other">
+                                        Other
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="form-row">
+
+                            <div class="form-group">
+
+                                <label for="description">
+                                    Description
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="description"
+                                    name="description"
+                                    placeholder="e.g. Lunch"
+                                >
+
+                            </div>
+
+
+                            <div class="form-group">
+
+                                <label for="date">
+                                    Date
+                                </label>
+
+                                <input
+                                    type="date"
+                                    id="date"
+                                    name="date"
+                                    required
+                                >
+
+                            </div>
+
+                        </div>
+
+
+                        <button type="submit">
+                            Add Expense
+                        </button>
+
+                    </form>
+
+                </div>
+
+
+                <!-- Expense Assistant -->
+
+                <div class="card assistant-card">
+
+                    <div class="card-heading">
+
+                        <div>
+
+                            <h2>Expense Assistant</h2>
+
+                            <p>
+                                Ask about spending or record an expense.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <form method="POST" action="/chat">
+
+                        <label for="message">
+                            Your message
+                        </label>
+
+                        <textarea
+                            id="message"
+                            name="message"
+                            placeholder="e.g. How much did I spend on food this month?"
+                            rows="5"
+                            required
+                        ></textarea>
+
+
+                        <button type="submit">
+                            Ask Agent
+                        </button>
+
+                    </form>
+
+
+                    {% if agent_response %}
+
+                    <div class="agent-response">
+
+                        <div class="response-title">
+                            Agent Response
+                        </div>
+
+                        <p>
+                            {{ agent_response }}
+                        </p>
+
+                    </div>
+
+                    {% endif %}
+
+                </div>
+
+            </section>
+
+
+            <!-- Analysis Area -->
+
+            <section class="analysis-grid">
+
+
+                <!-- Spending Breakdown -->
+
+                <div class="card breakdown-card">
+
+                    <div class="section-heading">
+
+                        <div>
+
+                            <h2>Spending Breakdown</h2>
+
+                            <p>
+                                Current month by category.
+                            </p>
+
+                        </div>
+
+                        <div class="month-label">
+                            This month
+                        </div>
+
+                    </div>
+
+
+                    {% if category_breakdown %}
+
+                    <div class="breakdown-list">
+
+                        {% for item in category_breakdown %}
+
+                        <div class="breakdown-item">
+
+                            <div class="breakdown-top">
+
+                                <span class="breakdown-category">
+                                    {{ item["category"] }}
+                                </span>
+
+                                <span class="breakdown-amount">
+                                    ₹{{ "%.2f"|format(item["total"]) }}
+                                </span>
+
+                            </div>
+
+
+                            <div class="bar-row">
+
+                                <div class="bar-background">
+
+                                    <div
+                                        class="bar-fill bar-width-{{ item['bar_percentage'] }}"
+                                    ></div>
+
+                                </div>
+
+                                <span class="percentage">
+                                    {{ "%.0f"|format(item["percentage"]) }}%
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                        {% endfor %}
+
+                    </div>
+
+                    {% else %}
+
+                    <div class="breakdown-empty">
+
+                        <p>
+                            No expenses recorded for this month.
+                        </p>
+
+                    </div>
+
+                    {% endif %}
+
+                </div>
+
+
+                <!-- Quick Questions -->
+
+                <div class="card quick-card">
+
+                    <div class="card-heading">
+
+                        <h2>Try asking</h2>
+
+                        <p>
+                            Examples of what the agent can understand.
+                        </p>
+
+                    </div>
+
+
+                    <div class="question-list">
+
+                        <div class="question-item">
+
+                            <span class="question-number">
+                                01
+                            </span>
+
+                            <span>
+                                How much did I spend this month?
+                            </span>
+
+                        </div>
+
+
+                        <div class="question-item">
+
+                            <span class="question-number">
+                                02
+                            </span>
+
+                            <span>
+                                How much did I spend on food?
+                            </span>
+
+                        </div>
+
+
+                        <div class="question-item">
+
+                            <span class="question-number">
+                                03
+                            </span>
+
+                            <span>
+                                How much did I spend today?
+                            </span>
+
+                        </div>
+
+
+                        <div class="question-item">
+
+                            <span class="question-number">
+                                04
+                            </span>
+
+                            <span>
+                                I spent ₹200 on coffee today.
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="quick-note">
+
+                        The assistant can read your expense data
+                        and record new expenses using its tools.
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- Recent Expenses -->
+
+            <section class="card expenses-card">
+
+                <div class="expenses-header">
+
+                    <div>
+
+                        <h2>Recent Expenses</h2>
+
+                        <p>
+                            Your latest recorded transactions.
+                        </p>
+
+                    </div>
+
+                    <div class="transaction-count">
+                        {{ transaction_count }} transactions
+                    </div>
+
+                </div>
+
+
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Action</th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            {% if expenses %}
+
+                                {% for expense in expenses %}
+
+                                <tr>
+
+                                    <td>
+                                        {{ expense["date"] }}
+                                    </td>
+
+                                    <td>
+
+                                        <span class="category">
+                                            {{ expense["category"] }}
+                                        </span>
+
+                                    </td>
+
+                                    <td>
+                                        {{ expense["description"] or "-" }}
+                                    </td>
+
+                                    <td class="amount-cell">
+                                        ₹{{ "%.2f"|format(expense["amount"]) }}
+                                    </td>
+
+                                    <td>
+
+                                        <form
+                                            method="POST"
+                                            action="/delete-expense/{{ expense['id'] }}"
+                                            class="delete-form"
+                                        >
+
+                                            <button
+                                                type="submit"
+                                                class="delete-button"
+                                            >
+                                                Delete
+                                            </button>
+
+                                        </form>
+
+                                    </td>
+
+                                </tr>
+
+                                {% endfor %}
+
+                            {% else %}
+
+                                <tr>
+
+                                    <td
+                                        colspan="5"
+                                        class="empty-state"
+                                    >
+                                        No expenses recorded yet.
+                                    </td>
+
+                                </tr>
+
+                            {% endif %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>
