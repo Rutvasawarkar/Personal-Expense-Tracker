@@ -11,161 +11,179 @@ from database import (
 )
 
 
-# Load variables from .env
+# ---------------------------------------------------------
+# Load environment variables
+# ---------------------------------------------------------
 load_dotenv()
 
 
-# Get API key
-api_key = os.getenv("OPENAI_API_KEY")
+# ---------------------------------------------------------
+# OpenRouter API key
+# ---------------------------------------------------------
+api_key = os.getenv("OPENROUTER_API_KEY")
 
 if not api_key:
     raise ValueError(
-        "OPENAI_API_KEY was not found. "
-        "Make sure it is present in your .env file."
+        "OPENROUTER_API_KEY was not found. "
+        "Make sure it is present in your .env file "
+        "and in Render environment variables."
     )
 
 
-# Create OpenAI client
-client = OpenAI(api_key=api_key)
+# ---------------------------------------------------------
+# Create OpenAI-compatible client for OpenRouter
+# ---------------------------------------------------------
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=api_key
+)
 
 
+# ---------------------------------------------------------
+# Free OpenRouter model router
+# ---------------------------------------------------------
+# OpenRouter automatically selects an available free model.
+# The free router supports tool calling.
+MODEL = "openrouter/free"
+
+
+# ---------------------------------------------------------
 # Today's date from Python
+# ---------------------------------------------------------
 TODAY = date.today().isoformat()
 
 
+# ---------------------------------------------------------
 # Tools available to the AI agent
+# ---------------------------------------------------------
 tools = [
 
-    # ---------------------------------------------------------
+    # -----------------------------------------------------
     # TOOL 1: Get spending summary
-    # ---------------------------------------------------------
-
+    # -----------------------------------------------------
     {
         "type": "function",
-        "name": "get_spending_summary",
-        "description": (
-            "Retrieve the user's actual spending from the expense "
-            "database. Use this when the user asks how much they "
-            "spent, asks about a category, or asks about spending "
-            "during a specific period. All amounts are in INR."
-        ),
-        "parameters": {
-            "type": "object",
+        "function": {
+            "name": "get_spending_summary",
+            "description": (
+                "Retrieve the user's actual spending from the expense "
+                "database. Use this when the user asks how much they "
+                "spent, asks about a category, or asks about spending "
+                "during a specific period. All amounts are in INR."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
 
-            "properties": {
+                    "category": {
+                        "type": ["string", "null"],
+                        "description": (
+                            "Expense category. Use exactly one of: "
+                            "Food, Travel, Shopping, Bills, Entertainment, "
+                            "Education, Other. "
+                            "Use null when asking about all categories."
+                        )
+                    },
 
-                "category": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": (
-                        "Expense category. Use exactly one of: "
-                        "Food, Travel, Shopping, Bills, Entertainment, "
-                        "Education, Other. "
-                        "Use null when asking about all categories."
-                    )
+                    "period": {
+                        "type": "string",
+                        "enum": [
+                            "all",
+                            "this_month",
+                            "today"
+                        ],
+                        "description": (
+                            "Use 'this_month' for the current month, "
+                            "'today' for today's expenses, and 'all' "
+                            "when there is no time restriction."
+                        )
+                    }
+
                 },
-
-                "period": {
-                    "type": "string",
-                    "enum": [
-                        "all",
-                        "this_month",
-                        "today"
-                    ],
-                    "description": (
-                        "Use 'this_month' for the current month, "
-                        "'today' for today's expenses, and 'all' "
-                        "when there is no time restriction."
-                    )
-                }
-
-            },
-
-            "required": [
-                "category",
-                "period"
-            ],
-
-            "additionalProperties": False
+                "required": [
+                    "category",
+                    "period"
+                ],
+                "additionalProperties": False
+            }
         }
     },
 
 
-    # ---------------------------------------------------------
+    # -----------------------------------------------------
     # TOOL 2: Add a new expense
-    # ---------------------------------------------------------
-
+    # -----------------------------------------------------
     {
         "type": "function",
-        "name": "add_expense",
-        "description": (
-            "Add a new expense to the user's SQLite expense database. "
-            "Use this when the user explicitly states that they spent "
-            "money or wants to record an expense. "
-            "All amounts are in Indian Rupees (INR)."
-        ),
-        "parameters": {
-            "type": "object",
+        "function": {
+            "name": "add_expense",
+            "description": (
+                "Add a new expense to the user's SQLite expense database. "
+                "Use this when the user explicitly states that they spent "
+                "money or wants to record an expense. "
+                "All amounts are in Indian Rupees (INR)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
 
-            "properties": {
+                    "amount": {
+                        "type": "number",
+                        "description": (
+                            "Amount spent in Indian Rupees. "
+                            "Must be greater than 0."
+                        )
+                    },
 
-                "amount": {
-                    "type": "number",
-                    "description": (
-                        "Amount spent in Indian Rupees. "
-                        "Must be greater than 0."
-                    )
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "Food",
+                            "Travel",
+                            "Shopping",
+                            "Bills",
+                            "Entertainment",
+                            "Education",
+                            "Other"
+                        ],
+                        "description": "Category of the expense."
+                    },
+
+                    "description": {
+                        "type": "string",
+                        "description": (
+                            "Short description of what the user spent "
+                            "the money on."
+                        )
+                    },
+
+                    "expense_date": {
+                        "type": "string",
+                        "description": (
+                            "Date of the expense in YYYY-MM-DD format. "
+                            f"Today's date is {TODAY}. "
+                            "Use today's date when the user says today."
+                        )
+                    }
+
                 },
-
-                "category": {
-                    "type": "string",
-                    "enum": [
-                        "Food",
-                        "Travel",
-                        "Shopping",
-                        "Bills",
-                        "Entertainment",
-                        "Education",
-                        "Other"
-                    ],
-                    "description": "Category of the expense."
-                },
-
-                "description": {
-                    "type": "string",
-                    "description": (
-                        "Short description of what the user spent "
-                        "the money on."
-                    )
-                },
-
-                "expense_date": {
-                    "type": "string",
-                    "description": (
-                        "Date of the expense in YYYY-MM-DD format. "
-                        f"Today's date is {TODAY}. "
-                        "Use today's date when the user says today."
-                    )
-                }
-
-            },
-
-            "required": [
-                "amount",
-                "category",
-                "description",
-                "expense_date"
-            ],
-
-            "additionalProperties": False
+                "required": [
+                    "amount",
+                    "category",
+                    "description",
+                    "expense_date"
+                ],
+                "additionalProperties": False
+            }
         }
     }
 
 ]
 
 
+# ---------------------------------------------------------
+# Validate agent-created expense data
+# ---------------------------------------------------------
 def validate_expense_data(
     amount,
     category,
@@ -193,6 +211,9 @@ def validate_expense_data(
         raise ValueError("Invalid expense category.")
 
     # Check description
+    if not isinstance(description, str):
+        description = "Expense"
+
     if not description.strip():
         description = "Expense"
 
@@ -207,6 +228,9 @@ def validate_expense_data(
     return description.strip()
 
 
+# ---------------------------------------------------------
+# Execute add_expense tool
+# ---------------------------------------------------------
 def execute_add_expense(arguments):
     """Execute the add_expense tool."""
 
@@ -242,155 +266,198 @@ def execute_add_expense(arguments):
     }
 
 
+# ---------------------------------------------------------
+# Execute requested tool
+# ---------------------------------------------------------
+def execute_tool(tool_name, arguments):
+    """Run the requested backend tool safely."""
+
+    if tool_name == "get_spending_summary":
+
+        category = arguments.get("category")
+        period = arguments.get("period", "all")
+
+        result = get_spending_summary(
+            category=category,
+            period=period
+        )
+
+        return {
+            "success": True,
+            "data": result
+        }
+
+    if tool_name == "add_expense":
+
+        try:
+            return execute_add_expense(arguments)
+
+        except (ValueError, KeyError, TypeError) as error:
+            return {
+                "success": False,
+                "message": str(error)
+            }
+
+    return {
+        "success": False,
+        "message": f"Unknown tool: {tool_name}"
+    }
+
+
+# ---------------------------------------------------------
+# Run the AI expense agent
+# ---------------------------------------------------------
 def run_agent(user_message):
-    """Run the AI expense agent."""
+    """Run the AI expense agent using OpenRouter."""
 
-    response = client.responses.create(
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a personal expense tracking assistant. "
 
-        model="gpt-5.6-luna",
+                "The user's actual expenses are stored in a SQLite database. "
 
-        instructions=(
-            "You are a personal expense tracking assistant. "
+                "All monetary values are in Indian Rupees (INR). "
+                "Always use the ₹ symbol when displaying money. "
 
-            "The user's actual expenses are stored in a SQLite database. "
+                "You have two tools: "
+                "get_spending_summary for reading expense data and "
+                "add_expense for recording a new expense. "
 
-            "All monetary values are in Indian Rupees (INR). "
-            "Always use the ₹ symbol when displaying money. "
+                "When the user asks about existing spending, "
+                "ALWAYS use get_spending_summary. "
 
-            "You have two tools: "
-            "get_spending_summary for reading expense data and "
-            "add_expense for recording a new expense. "
+                "When the user explicitly says they spent money or "
+                "asks you to record an expense, use add_expense. "
 
-            "When the user asks about existing spending, "
-            "ALWAYS use get_spending_summary. "
+                f"Today's date is {TODAY}. "
+                "When the user says today, use today's date. "
 
-            "When the user explicitly says they spent money or "
-            "asks you to record an expense, use add_expense. "
+                "For category questions, use null when no category "
+                "is specified. Never use 'All categories' as a category. "
 
-            f"Today's date is {TODAY}. "
-            "When the user says today, use today's date. "
+                "Never invent expense data. "
 
-            "For category questions, use null when no category "
-            "is specified. Never use 'All categories' as a category. "
+                "For financial figures, rely on the database tool result. "
+                "Do not calculate or estimate totals yourself. "
 
-            "Never invent expense data."
-        ),
+                "If the user clearly asks to record multiple separate "
+                "expenses, you may make multiple add_expense tool calls."
+            )
+        },
+        {
+            "role": "user",
+            "content": user_message
+        }
+    ]
 
-        input=user_message,
+    # -----------------------------------------------------
+    # Tool-calling loop
+    # -----------------------------------------------------
+    # Allows the agent to handle one or multiple tool calls.
+    # -----------------------------------------------------
+    for _ in range(3):
 
-        tools=tools
+        try:
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                tools=tools,
+                tool_choice="auto"
+            )
+
+        except Exception as error:
+            print(f"OpenRouter API error: {error}")
+
+            return (
+                "The AI service is temporarily unavailable. "
+                "Please try again."
+            )
+
+        message = response.choices[0].message
+
+        # -------------------------------------------------
+        # No tool call = final answer
+        # -------------------------------------------------
+        if not message.tool_calls:
+
+            return message.content or (
+                "I couldn't generate a response. Please try again."
+            )
+
+        # -------------------------------------------------
+        # Add assistant tool-call message
+        # -------------------------------------------------
+        assistant_tool_calls = []
+
+        for tool_call in message.tool_calls:
+            assistant_tool_calls.append(
+                {
+                    "id": tool_call.id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments
+                    }
+                }
+            )
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": message.content or "",
+                "tool_calls": assistant_tool_calls
+            }
+        )
+
+        # -------------------------------------------------
+        # Execute every requested tool
+        # -------------------------------------------------
+        for tool_call in message.tool_calls:
+
+            try:
+                arguments = json.loads(
+                    tool_call.function.arguments
+                )
+
+            except json.JSONDecodeError:
+                result = {
+                    "success": False,
+                    "message": (
+                        "Invalid tool arguments generated by the model."
+                    )
+                }
+
+            else:
+                result = execute_tool(
+                    tool_name=tool_call.function.name,
+                    arguments=arguments
+                )
+
+            # -------------------------------------------------
+            # Send tool result back to the model
+            # -------------------------------------------------
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": json.dumps(
+                        result,
+                        ensure_ascii=False
+                    )
+                }
+            )
+
+    return (
+        "The agent reached its tool-processing limit. "
+        "Please try a simpler request."
     )
 
 
-    # Check whether the model called a tool
-    for item in response.output:
-
-        if item.type != "function_call":
-            continue
-
-
-        # -----------------------------------------------------
-        # Spending summary tool
-        # -----------------------------------------------------
-
-        if item.name == "get_spending_summary":
-
-            arguments = json.loads(item.arguments)
-
-            category = arguments.get("category")
-            period = arguments.get("period", "all")
-
-            result = get_spending_summary(
-                category=category,
-                period=period
-            )
-
-            final_response = client.responses.create(
-
-                model="gpt-5.6-luna",
-
-                instructions=(
-                    "Answer the user's question using the database "
-                    "result provided. "
-
-                    "All monetary values are in Indian Rupees. "
-                    "Always use the ₹ symbol. "
-
-                    "Do not change, invent, or estimate the numbers. "
-
-                    "Keep the answer concise and clear."
-                ),
-
-                input=[
-                    {
-                        "type": "function_call_output",
-                        "call_id": item.call_id,
-                        "output": json.dumps(result)
-                    }
-                ],
-
-                previous_response_id=response.id
-            )
-
-            return final_response.output_text
-
-
-        # -----------------------------------------------------
-        # Add expense tool
-        # -----------------------------------------------------
-
-        if item.name == "add_expense":
-
-            arguments = json.loads(item.arguments)
-
-            try:
-
-                result = execute_add_expense(arguments)
-
-            except ValueError as error:
-
-                result = {
-                    "success": False,
-                    "message": str(error)
-                }
-
-
-            final_response = client.responses.create(
-
-                model="gpt-5.6-luna",
-
-                instructions=(
-                    "Tell the user what happened using the tool result. "
-
-                    "If the expense was successfully added, confirm "
-                    "the amount, category, description, and date. "
-
-                    "All monetary values are in Indian Rupees. "
-                    "Always use the ₹ symbol. "
-
-                    "Do not claim an expense was added if success is false. "
-
-                    "Keep the response concise."
-                ),
-
-                input=[
-                    {
-                        "type": "function_call_output",
-                        "call_id": item.call_id,
-                        "output": json.dumps(result)
-                    }
-                ],
-
-                previous_response_id=response.id
-            )
-
-            return final_response.output_text
-
-
-    # No tool was needed
-    return response.output_text
-
-
+# ---------------------------------------------------------
+# Direct terminal testing
+# ---------------------------------------------------------
 if __name__ == "__main__":
 
     question = input("Ask the expense agent: ")
